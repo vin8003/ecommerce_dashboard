@@ -9,10 +9,16 @@ https://docs.djangoproject.com/en/3.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.2/ref/settings/
 """
+import logging
 import os
 from pathlib import Path
-from decouple import config
+
 import dj_database_url
+import sentry_sdk
+from decouple import config
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -138,3 +144,23 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+# setry
+SENTRY_DSN = config('SENTRY_DSN')
+if SENTRY_DSN:
+    print('SENTRY_DSN is set')
+    sentry_logging = LoggingIntegration(
+        level=logging.INFO,  # Capture INFO and above as breadcrumbs
+        event_level=logging.ERROR  # Send events for ERROR and above
+    )
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(),
+            CeleryIntegration(),
+            sentry_logging,
+        ],
+        traces_sample_rate=0.1,  # Adjust for performance monitoring
+        send_default_pii=True,  # Send PII (e.g., user data)
+    )

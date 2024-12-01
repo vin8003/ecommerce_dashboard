@@ -1,10 +1,16 @@
 import csv
-from celery import shared_task
-from sales.models import Customer, Product, Order, OrderItem, Delivery, Platform
+import logging
 from datetime import datetime
-from django.db import transaction
-from django.conf import settings
+
+from celery import shared_task
+from celery.exceptions import MaxRetriesExceededError
 from django.core.files.storage import default_storage
+from django.db import transaction
+
+from sales.models import (Customer, Delivery, Order, OrderItem, Platform,
+                          Product)
+
+logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3)
 def import_data_task(self, platform, file_path):
@@ -14,12 +20,28 @@ def import_data_task(self, platform, file_path):
     try:
         platform_instance = Platform.objects.get(platform_name__iexact=platform)
     except Platform.DoesNotExist:
-        raise Exception(f"Platform '{platform}' not configured.")
+        error_message = f"Platform '{platform}' not found."
+        logger.error(error_message)
+        default_storage.delete(file_path)
+        raise Exception(error_message)
+
 
     try:
         import_platform_data(platform_instance, file_path)
+        default_storage.delete(file_path)
     except Exception as e:
-        self.retry(exc=e, max_retries=3)
+        # Log the error
+        error_message = f"Error importing data for platform '{platform}': {str(e)}"
+        logger.error(error_message)
+
+        # Retry the task
+        try:
+            self.retry(exc=e, countdown=60)  # Retry after 60 seconds
+        except MaxRetriesExceededError:
+            logger.error("Max retries exceeded, raising exception.")
+            default_storage.delete(file_path)  # Ensure file deletion on final failure
+            raise e
+
 
 def import_platform_data(platform, file_path):
     """
@@ -28,105 +50,98 @@ def import_platform_data(platform, file_path):
     platform_name = platform.platform_name
     platform_config = platform.platform_config
 
-    try:
-        with open(file_path, 'r') as file:
-            reader = csv.DictReader(file)
-            batch_size = platform_config.get('batch_size', 1000)
+    with open(file_path, 'r') as file:
+        reader = csv.DictReader(file)
+        batch_size = platform_config.get('batch_size', 1000)
 
-            # Initialize data collections
-            customers_data = {}
-            products_data = {}
-            orders_data = []
-            order_items_data = []
-            deliveries_data = []
+        # Initialize data collections
+        customers_data = {}
+        products_data = {}
+        orders_data = []
+        order_items_data = []
+        deliveries_data = []
 
-            count = 0
+        count = 0
 
-            for row in reader:
-                field_mapping = platform_config.get('field_mapping', {})
-                customer_id = row.get(field_mapping.get('customer_id'))
-                product_id = row.get(field_mapping.get('product_id'))
+        for row in reader:
+            field_mapping = platform_config.get('field_mapping', {})
+            customer_id = row.get(field_mapping.get('customer_id'))
+            product_id = row.get(field_mapping.get('product_id'))
 
-                # Collect customer data
-                customers_data[customer_id] = {
-                    'customer_id': customer_id,
-                    'customer_name': row.get(field_mapping.get('customer_name')),
-                    'contact_email': row.get(field_mapping.get('contact_email')),
-                    'phone_number': row.get(field_mapping.get('phone_number')),
-                }
+            # Collect customer data
+            customers_data[customer_id] = {
+                'customer_id': customer_id,
+                'customer_name': row.get(field_mapping.get('customer_name')),
+                'contact_email': row.get(field_mapping.get('contact_email')),
+                'phone_number': row.get(field_mapping.get('phone_number')),
+            }
 
-                # Collect product data
-                products_data[product_id] = {
-                    'product_id': product_id,
-                    'product_name': row.get(field_mapping.get('product_name')),
-                    'category': row.get(field_mapping.get('product_category')),
-                }
+            # Collect product data
+            products_data[product_id] = {
+                'product_id': product_id,
+                'product_name': row.get(field_mapping.get('product_name')),
+                'category': row.get(field_mapping.get('product_category')),
+            }
 
-                # Parse dates
-                order_date = parse_date(
-                    row.get(field_mapping.get('order_date')),
-                    platform_config.get('order_date_format')
-                )
-                delivery_date = parse_date(
-                    row.get(field_mapping.get('delivery_date')),
-                    platform_config.get('delivery_date_format')
-                )
+            # Parse dates
+            order_date = parse_date(
+                row.get(field_mapping.get('order_date')),
+                platform_config.get('order_date_format')
+            )
+            delivery_date = parse_date(
+                row.get(field_mapping.get('delivery_date')),
+                platform_config.get('delivery_date_format')
+            )
 
-                # Collect order data
-                orders_data.append({
-                    'order_id': row.get(field_mapping.get('order_id')),
-                    'customer_id': customer_id,
-                    'platform_id': platform.platform_id,
-                    'order_date': order_date,
-                    'platform_data': extract_platform_data(platform_config, row),
-                })
+            # Collect order data
+            orders_data.append({
+                'order_id': row.get(field_mapping.get('order_id')),
+                'customer_id': customer_id,
+                'platform_id': platform.platform_id,
+                'order_date': order_date,
+                'platform_data': extract_platform_data(platform_config, row),
+            })
 
-                # Collect order item data
-                item_quantity = float(row.get(field_mapping.get('item_quantity'), 0))
-                item_selling_price = float(row.get(field_mapping.get('item_selling_price'), 0))
-                item_total_value = item_quantity * item_selling_price
+            # Collect order item data
+            item_quantity = float(row.get(field_mapping.get('item_quantity'), 0))
+            item_selling_price = float(row.get(field_mapping.get('item_selling_price'), 0))
+            item_total_value = item_quantity * item_selling_price
 
-                order_items_data.append({
-                    'order_id': row.get(field_mapping.get('order_id')),
-                    'product_id': product_id,
-                    'quantity_sold': item_quantity,
-                    'selling_price': item_selling_price,
-                    'total_sale_value': item_total_value,
-                })
+            order_items_data.append({
+                'order_id': row.get(field_mapping.get('order_id')),
+                'product_id': product_id,
+                'quantity_sold': item_quantity,
+                'selling_price': item_selling_price,
+                'total_sale_value': item_total_value,
+            })
 
-                # Collect delivery data
-                deliveries_data.append({
-                    'order_id': row.get(field_mapping.get('order_id')),
-                    'delivery_address': row.get(field_mapping.get('delivery_address')),
-                    'delivery_date': delivery_date,
-                    'delivery_status': row.get(field_mapping.get('delivery_status')),
-                    'delivery_partner': row.get(field_mapping.get('delivery_partner')),
-                    'delivery_data': extract_delivery_data(platform_config, row),
-                })
+            # Collect delivery data
+            deliveries_data.append({
+                'order_id': row.get(field_mapping.get('order_id')),
+                'delivery_address': row.get(field_mapping.get('delivery_address')),
+                'delivery_date': delivery_date,
+                'delivery_status': row.get(field_mapping.get('delivery_status')),
+                'delivery_partner': row.get(field_mapping.get('delivery_partner')),
+                'delivery_data': extract_delivery_data(platform_config, row),
+            })
 
-                count += 1
+            count += 1
 
-                if count % batch_size == 0:
-                    # Process batch
-                    process_batch(customers_data, products_data, orders_data, order_items_data, deliveries_data)
-                    # Reset data collections
-                    customers_data = {}
-                    products_data = {}
-                    orders_data = []
-                    order_items_data = []
-                    deliveries_data = []
-
-            # Process any remaining data
-            if orders_data:
+            if count % batch_size == 0:
+                # Process batch
                 process_batch(customers_data, products_data, orders_data, order_items_data, deliveries_data)
+                # Reset data collections
+                customers_data = {}
+                products_data = {}
+                orders_data = []
+                order_items_data = []
+                deliveries_data = []
 
-            print(f'Data imported for {platform_name.capitalize()}.')
+        # Process any remaining data
+        if orders_data:
+            process_batch(customers_data, products_data, orders_data, order_items_data, deliveries_data)
 
-    except Exception as e:
-        # Handle exceptions and optionally log them
-        print(f'Error importing data for {platform_name.capitalize()}: {e}')
-    finally:
-        default_storage.delete(file_path)
+        logger.info(f'Data imported for {platform_name.capitalize()}')
 
 def process_batch(customers_data, products_data, orders_data, order_items_data, deliveries_data):
     """

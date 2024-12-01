@@ -1,18 +1,21 @@
 import csv
+import logging
 
-from django.db.models import Sum, Prefetch
+from django.core.files.storage import default_storage
+from django.db.models import Prefetch, Sum
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse
-from django.core.files.storage import default_storage
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from sales.serializers import OrderSerializer
-from sales.models import Order, OrderItem
-from sales.tasks import import_data_task
-from sales.filters import OrderFilter
 
+from sales.filters import OrderFilter
+from sales.models import Order, OrderItem
+from sales.serializers import OrderSerializer
+from sales.tasks import import_data_task
+
+logger = logging.getLogger(__name__)
 
 
 class DataImportAPI(APIView):
@@ -20,43 +23,68 @@ class DataImportAPI(APIView):
     API endpoint to initiate data import task with file upload.
     """
     def post(self, request, *args, **kwargs):
-        platform = request.data.get('platform')
-        uploaded_file = request.FILES.get('file')  # Get the uploaded file
+        try:
+            platform = request.data.get('platform')
+            uploaded_file = request.FILES.get('file')  # Get the uploaded file
 
-        if not platform or not uploaded_file:
-            return Response(
-                {"error": "Platform and a file must be provided."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            if not platform or not uploaded_file:
+                return Response(
+                    {"error": "Platform and a file must be provided."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        # Save the file temporarily
-        file_path = default_storage.save('tmp/' + uploaded_file.name, uploaded_file)
+            # Save the file temporarily
+            file_path = default_storage.save('tmp/' + uploaded_file.name, uploaded_file)
 
-        # Trigger the Celery task
-        import_data_task.delay(platform, file_path)
-        return Response({"message": "Data import task has been initiated with the uploaded file."})
+            # Trigger the Celery task
+            import_data_task.delay(platform, file_path)
+            response = {
+                "message": "Data import task has been initiated with the uploaded file."
+            }
+
+        except Exception as e:
+            error_message = f"Error importing data: {str(e)}"
+            logger.error(error_message)
+            response = {
+                "error": error_message
+            }
+        return Response(response)
 
 
 class MonthlySalesVolume(APIView):
     def get(self, request):
-        data = OrderItem.objects.annotate(
-            month=TruncMonth('order__order_date')).values(
-            'month').annotate(
-            total_quantity=Sum('quantity_sold')).order_by(
-            'month'
-        )
-        return Response(data)
+        try:
+            response = OrderItem.objects.annotate(
+                month=TruncMonth('order__order_date')).values(
+                'month').annotate(
+                total_quantity=Sum('quantity_sold')).order_by(
+                'month'
+            )
+        except Exception as e:
+            error_message = f"Error fetching monthly sales volume: {str(e)}"
+            logger.error(error_message)
+            response = {
+                "error": error_message
+            }
+        return Response(response)
 
 
 class MonthlyRevenue(APIView):
     def get(self, request):
-        data = OrderItem.objects.annotate(
-            month=TruncMonth('order__order_date')).values(
-            'month').annotate(
-            total_revenue=Sum('total_sale_value')).order_by(
-            'month'
-        )
-        return Response(data)
+        try:
+            response = OrderItem.objects.annotate(
+                month=TruncMonth('order__order_date')).values(
+                'month').annotate(
+                total_revenue=Sum('total_sale_value')).order_by(
+                'month'
+            )
+        except Exception as e:
+            error_message = f"Error fetching monthly revenue: {str(e)}"
+            logger.error(error_message)
+            response = {
+                "error": error_message
+            }
+        return Response(response)
 
 
 class OrderListView(generics.ListAPIView):
@@ -138,30 +166,44 @@ class OrderListView(generics.ListAPIView):
         return response
 
     def list(self, request, *args, **kwargs):
-        export = request.query_params.get('export', False)
-        export = True if export == 'true' else False
-        if export:
-            return self.export_to_csv()
-        else:
-            response = super().list(request, *args, **kwargs)
+        try:
+            export = request.query_params.get('export', False)
+            export = True if export == 'true' else False
+            if export:
+                response = self.export_to_csv()
+            else:
+                response = super().list(request, *args, **kwargs)
+        except Exception as e:
+            error_message = f"Error fetching orders: {str(e)}"
+            logger.error(error_message)
+            response = Response({
+                "error": error_message
+            })
         return response
 
 
 class SummaryMetricsAPI(APIView):
     def get(self, request):
-        total_revenue = OrderItem.objects.aggregate(Sum('total_sale_value'))
-        total_orders = Order.objects.count()
-        total_products_sold = OrderItem.objects.aggregate(
-            total_sold=Sum('quantity_sold'))
-        canceled_orders_percentage = (
-            Order.objects.filter(delivery__delivery_status='Cancelled').count() /
-            float(Order.objects.count()) * 100
-        )
+        try:
+            total_revenue = OrderItem.objects.aggregate(Sum('total_sale_value'))
+            total_orders = Order.objects.count()
+            total_products_sold = OrderItem.objects.aggregate(
+                total_sold=Sum('quantity_sold'))
+            canceled_orders_percentage = (
+                Order.objects.filter(delivery__delivery_status='Cancelled').count() /
+                float(Order.objects.count()) * 100
+            )
 
-        data = {
-            'total_revenue': total_revenue,
-            'total_orders': total_orders,
-            'total_products_sold': total_products_sold['total_sold'],
-            'canceled_order_percentage': canceled_orders_percentage
-        }
-        return Response(data)
+            response = {
+                'total_revenue': total_revenue,
+                'total_orders': total_orders,
+                'total_products_sold': total_products_sold['total_sold'],
+                'canceled_order_percentage': canceled_orders_percentage
+            }
+        except Exception as e:
+            error_message = f"Error fetching summary metrics: {str(e)}"
+            logger.error(error_message)
+            response = {
+                "error": error_message
+            }
+        return Response(response)
