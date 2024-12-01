@@ -1,0 +1,83 @@
+{
+  "Amazon": {
+    "batch_size": 1000,
+    "order_date_format": "%Y-%m-%d",
+    "delivery_date_format": "%Y-%m-%d",
+    "field_mapping": {
+      "customer_id": "CustomerID",
+      "customer_name": "CustomerName",
+      "contact_email": "ContactEmail",
+      "phone_number": "PhoneNumber",
+      "order_id": "OrderID",
+      "order_date": "DateOfSale",
+      "product_id": "ProductID",
+      "product_name": "ProductName",
+      "product_category": "Category",
+      "item_quantity": "QuantitySold",
+      "item_selling_price": "SellingPrice",
+      "delivery_address": "DeliveryAddress",
+      "delivery_date": "DeliveryDate",
+      "delivery_status": "DeliveryStatus",
+      "delivery_partner": null
+    },
+    "platform_data_field_mapping": {
+      "PrimeDelivery": "PrimeDelivery",
+      "WarehouseLocation": "WarehouseLocation"
+    },
+    "delivery_data_field_mapping": {}
+  },
+  "Flipkart": {
+    "batch_size": 1000,
+    "order_date_format": "%Y-%m-%d",
+    "delivery_date_format": "%Y-%m-%d",
+    "field_mapping": {
+      "customer_id": "CustomerID",
+      "customer_name": "CustomerName",
+      "contact_email": "ContactEmail",
+      "phone_number": "PhoneNumber",
+      "order_id": "OrderID",
+      "order_date": "DateOfSale",
+      "product_id": "ProductID",
+      "product_name": "ProductName",
+      "product_category": "Category",
+      "item_quantity": "QuantitySold",
+      "item_selling_price": "SellingPrice",
+      "delivery_address": "DeliveryAddress",
+      "delivery_date": "DeliveryDate",
+      "delivery_status": "DeliveryStatus",
+      "delivery_partner": null
+    },
+    "platform_data_field_mapping": {
+      "CouponUsed": "CouponUsed",
+      "ReturnWindow": "ReturnWindow"
+    },
+    "delivery_data_field_mapping": {}
+  },
+  "Meesho": {
+    "batch_size": 1000,
+    "order_date_format": "%Y-%m-%d",
+    "delivery_date_format": "%Y-%m-%d",
+    "field_mapping": {
+      "customer_id": "CustomerID",
+      "customer_name": "CustomerName",
+      "contact_email": "ContactEmail",
+      "phone_number": "PhoneNumber",
+      "order_id": "OrderID",
+      "order_date": "DateOfSale",
+      "product_id": "ProductID",
+      "product_name": "ProductName",
+      "product_category": "Category",
+      "item_quantity": "QuantitySold",
+      "item_selling_price": "SellingPrice",
+      "delivery_address": "DeliveryAddress",
+      "delivery_date": "DeliveryDate",
+      "delivery_status": "DeliveryStatus",
+      "delivery_partner": null
+    },
+    "platform_data_field_mapping": {
+      "ResellerName": "ResellerName",
+      "CommissionPercentage": "CommissionPercentage"
+    },
+    "delivery_data_field_mapping": {}
+  }
+}

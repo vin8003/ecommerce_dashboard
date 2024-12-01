@@ -1,0 +1,18 @@
+# Dockerfile
+
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED 1
+ENV DJANGO_SETTINGS_MODULE=ecommerce_dashboard.settings
+
+WORKDIR /app
+
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+EXPOSE 8000
+
+COPY . /app/
+
+# Default command (can be overridden by docker-compose)
+CMD ["gunicorn", "ecommerce_dashboard.wsgi:application", "--bind", "0.0.0.0:8000"]

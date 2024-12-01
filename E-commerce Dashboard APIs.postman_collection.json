@@ -1,0 +1,200 @@
+{
+	"info": {
+		"_postman_id": "fc5092c2-61b1-4ca6-8345-a14ee2fa42c3",
+		"name": "E-commerce Dashboard APIs",
+		"description": "Collection of APIs for the E-commerce Data Visualization Dashboard",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1008057",
+		"_collection_link": "https://devs-meddelivery.postman.co/workspace/vineet's-workspace~94338337-2fe4-4f46-8774-ab1e1c3a2eae/collection/1008057-fc5092c2-61b1-4ca6-8345-a14ee2fa42c3?action=share&source=collection_link&creator=1008057"
+	},
+	"item": [
+		{
+			"name": "Monthly Sales Volume",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/monthly-sales-volume/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"monthly-sales-volume",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Monthly Revenue",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/monthly-revenue/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"monthly-revenue",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Sales Data Table",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/orders/?start_date={{start_date}}&end_date={{end_date}}&state=State-21&category=Books&platform=amazon",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"orders",
+						""
+					],
+					"query": [
+						{
+							"key": "start_date",
+							"value": "{{start_date}}",
+							"description": "Filter: Start date (YYYY-MM-DD)"
+						},
+						{
+							"key": "end_date",
+							"value": "{{end_date}}",
+							"description": "Filter: End date (YYYY-MM-DD)"
+						},
+						{
+							"key": "state",
+							"value": "State-21"
+						},
+						{
+							"key": "category",
+							"value": "Books"
+						},
+						{
+							"key": "page",
+							"value": "2900",
+							"disabled": true
+						},
+						{
+							"key": "export",
+							"value": "true",
+							"disabled": true
+						},
+						{
+							"key": "platform",
+							"value": "amazon"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Summary Metrics",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/summary-metrics/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"summary-metrics",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "upload data",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Token your_token_here"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "platform",
+							"value": "flipkart",
+							"type": "text"
+						},
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/Users/vin8003/Downloads/flipkart_data_with_unique_columns (1).csv"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8000/api/import-data/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8000",
+					"path": [
+						"api",
+						"import-data",
+						""
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000",
+			"type": "string"
+		},
+		{
+			"key": "start_date",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "end_date",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "category",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "delivery_status",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "platform",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "state",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
